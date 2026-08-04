@@ -30,11 +30,6 @@ const Char = React.memo(({char: {char, state}, colors}: {
     <span
         style={{
             color: state === "future" ? colors.inactive : colors.active,
-            textShadow: state === "active"
-                ? `0 0 18px ${colors.glow}, 0 0 8px ${colors.glow}, 0 4px 12px rgba(0,0,0,0.5)`
-                : state === "past"
-                    ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${colors.glowSoft}`
-                    : "0 2px 4px rgba(0,0,0,0.25)",
             filter: state === "active"
                 ? "brightness(1.4) saturate(1.2)"
                 : state === "past" ? "brightness(1.05)" : "brightness(0.88)",
@@ -76,9 +71,6 @@ const Syllable = React.memo(({syllable, currentProgressMs, colors}: {
     return (
         <span style={{
             color: isPast ? colors.active : colors.inactive,
-            textShadow: isPast
-                ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${colors.glowSoft}`
-                : "0 2px 4px rgba(0,0,0,0.25)",
             filter: isPast ? "brightness(1.05)" : "brightness(0.88)",
             transition: "color 0.12s ease, text-shadow 0.18s ease",
             letterSpacing: "0.02em",
