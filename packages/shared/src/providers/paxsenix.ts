@@ -1,7 +1,7 @@
-import { LyricLine, LyricSyllable } from '../types/song';
-import { LyricsProvider } from './types';
-import { httpGet, httpGetJson } from '../utils/httpFetch';
-import { buildLineText } from '../utils/lyrics';
+import {LyricLine, LyricSyllable} from '../types/song';
+import {LyricsProvider} from './types';
+import {httpGet, httpGetJson} from '../utils/httpFetch';
+import {buildLineText} from '../utils/lyrics';
 
 let cachedToken: string | null = null;
 
@@ -12,11 +12,11 @@ const AM_WEB = 'https://beta.music.apple.com';
 async function fetchAppleMusicToken(forceRefresh = false): Promise<string> {
     if (!forceRefresh && cachedToken) return cachedToken;
 
-    const mainHtml = await httpGet(AM_WEB, { 'User-Agent': BROWSER_UA });
+    const mainHtml = await httpGet(AM_WEB, {'User-Agent': BROWSER_UA});
     const indexJsMatch = mainHtml.match(/\/assets\/index~[^/]+\.js/);
     if (!indexJsMatch) throw new Error('[Paxsenix] index JS URL not found');
 
-    const jsBundle = await httpGet(AM_WEB + indexJsMatch[0], { 'User-Agent': BROWSER_UA });
+    const jsBundle = await httpGet(AM_WEB + indexJsMatch[0], {'User-Agent': BROWSER_UA});
     const tokenMatch = jsBundle.match(/eyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+/);
     if (!tokenMatch) throw new Error('[Paxsenix] JWT token not found in JS bundle');
 
@@ -36,12 +36,12 @@ function amHeaders(token: string): Record<string, string> {
     };
 }
 
-async function searchAppleMusic(title: string, artist: string, token: string): Promise<string | null> {
+async function searchAppleMusic(title: string, artist: string, token: string, signal: AbortSignal): Promise<string | null> {
     const term = encodeURIComponent(`${title} ${artist}`);
     const url = `${AM_API}/search?term=${term}&types=songs&limit=25&l=en-US&platform=web&format[resources]=map&include[songs]=artists&extend=artistUrl`;
 
     try {
-        const body: any = await httpGetJson(url, amHeaders(token));
+        const body: any = await httpGetJson(url, amHeaders(token), signal);
         const songsData: any[] = body?.results?.songs?.data ?? [];
         if (!songsData.length) return null;
 
@@ -63,23 +63,23 @@ export class PaxsenixProvider implements LyricsProvider {
     private static PAXSENIX_API = 'https://lyrics.paxsenix.org/apple-music/lyrics?id=';
     readonly name = 'paxsenix';
 
-    async fetchLyrics(title: string, artist: string, _album: string): Promise<LyricLine[]> {
-        const trackId = await this.resolveTrackId(title, artist)
+    async fetchLyrics(title: string, artist: string, _album: string, signal: AbortSignal): Promise<LyricLine[]> {
+        const trackId = await this.resolveTrackId(title, artist, signal)
         if (!trackId) return [];
 
-        return this.fetchFromPaxsenix(trackId);
+        return this.fetchFromPaxsenix(trackId, signal);
     }
 
-    private async resolveTrackId(title: string, artist: string): Promise<string | null> {
+    private async resolveTrackId(title: string, artist: string, signal: AbortSignal): Promise<string | null> {
         try {
             let token = await fetchAppleMusicToken();
             try {
-                return await searchAppleMusic(title, artist, token);
+                return await searchAppleMusic(title, artist, token, signal);
             } catch (err: any) {
                 if (err.message === '401' && cachedToken) {
                     cachedToken = null;
                     token = await fetchAppleMusicToken(true);
-                    return await searchAppleMusic(title, artist, token);
+                    return await searchAppleMusic(title, artist, token, signal);
                 }
 
                 throw err;
@@ -90,9 +90,9 @@ export class PaxsenixProvider implements LyricsProvider {
         }
     }
 
-    private async fetchFromPaxsenix(trackId: string): Promise<LyricLine[]> {
+    private async fetchFromPaxsenix(trackId: string, signal: AbortSignal): Promise<LyricLine[]> {
         try {
-            const body = await httpGetJson(`${PaxsenixProvider.PAXSENIX_API}${trackId}`);
+            const body = await httpGetJson(`${PaxsenixProvider.PAXSENIX_API}${trackId}`, {}, signal);
             return PaxsenixProvider.parse(body);
         } catch {
             return [];

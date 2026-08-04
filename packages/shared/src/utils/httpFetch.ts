@@ -1,28 +1,40 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from "axios";
 
-type Headers = Record<string, string>;
+let httpInstance: AxiosInstance = axios.create({
+    timeout: 12000,
+});
 
-const isTauri = (): boolean =>
-    typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-
-// TODO: optimize this
-export async function httpGet(url: string, headers: Headers = {}): Promise<string> {
-    if (isTauri()) {
-        const { invoke } = await import('@tauri-apps/api/core');
-        return invoke<string>('http_get', { url, headers });
-    }
-
-    const res = await axios.get<string>(url, {
-        headers,
-        timeout: 12_000,
-        responseType: 'text',
-        transformResponse: (d) => d,
-    });
-
-    return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+export function getHttp(): AxiosInstance {
+    return httpInstance;
 }
 
-export async function httpGetJson<T = any>(url: string, headers: Headers = {}): Promise<T> {
-    const text = await httpGet(url, headers);
+export function setHttpInstance(instance: AxiosInstance) {
+    httpInstance = instance;
+}
+
+export async function httpGet(
+    url: string,
+    headers: Record<string, string> = {},
+    signal?: AbortSignal
+): Promise<string> {
+    const res = await getHttp().get<string>(url, {
+        headers,
+        responseType: "text",
+        transformResponse: [(data) => data],
+        signal,
+    });
+
+    return typeof res.data === 'string'
+        ? res.data
+        : JSON.stringify(res.data);
+}
+
+export async function httpGetJson<T = unknown>(
+    url: string,
+    headers: Record<string, string> = {},
+    signal?: AbortSignal
+): Promise<T> {
+    const text = await httpGet(url, headers, signal);
+
     return JSON.parse(text) as T;
 }

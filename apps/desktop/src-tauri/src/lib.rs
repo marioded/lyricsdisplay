@@ -63,7 +63,7 @@ fn get_current_track() -> Option<FrontendTrack> {
     }) {
         Ok(track) => track,
         Err(err) => {
-            eprintln!("Panic catturato: {:?}", err);
+            eprintln!("Panic caught: {:?}", err);
             None
         }
     }

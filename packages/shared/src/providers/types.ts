@@ -7,6 +7,7 @@ export interface LyricsProvider {
         title: string,
         artist: string,
         album: string,
+        signal?: AbortSignal
     ): Promise<LyricLine[]>;
 }
 
@@ -17,6 +18,7 @@ function cleanTitle(title: string) {
 export class LyricsProviderManager {
     private readonly providers: LyricsProvider[];
     private readonly cache = new Map<string, LyricLine[]>();
+    private currentAbortController: AbortController | null = null;
 
     constructor(providers: LyricsProvider[]) {
         this.providers = providers;
@@ -35,22 +37,56 @@ export class LyricsProviderManager {
             return this.cache.get(key)!;
         }
 
-        for (const provider of this.providers) {
-            try {
-                console.log(`[LyricsProvider] Trying ${provider.name} for "${title}" by "${artist}"`);
-                const lyrics = await provider.fetchLyrics(title, artist, album);
-                if (lyrics.length > 0) {
-                    console.log(`[LyricsProvider] ${provider.name} returned ${lyrics.length} lines`);
-                    this.setCache(key, lyrics);
-                    return lyrics;
+        this.currentAbortController?.abort();
+
+        const controller = new AbortController();
+        this.currentAbortController = controller;
+
+        try {
+            for (const provider of this.providers) {
+                try {
+                    console.log(`[LyricsProvider] Trying ${provider.name} for "${title}" by "${artist}"`);
+
+                    const lyrics = await provider.fetchLyrics(
+                        title,
+                        artist,
+                        album,
+                        controller.signal
+                    );
+
+                    if (lyrics.length > 0) {
+                        console.log(`[LyricsProvider] ${provider.name} returned ${lyrics.length} lines`);
+
+                        this.setCache(key, lyrics);
+                        return lyrics;
+                    }
+
+                    console.log(`[LyricsProvider] ${provider.name} returned nothing`);
+                } catch (err: any) {
+
+                    if (
+                        err.name === "AbortError" ||
+                        err.name === "CanceledError" ||
+                        controller.signal.aborted
+                    ) {
+                        console.log("[LyricsProvider] Request aborted");
+                        return [];
+                    }
+
+                    console.warn(
+                        `[LyricsProvider] ${provider.name} threw:`,
+                        err
+                    );
                 }
-                console.log(`[LyricsProvider] ${provider.name} returned nothing`);
-            } catch (err) {
-                console.warn(`[LyricsProvider] ${provider.name} threw:`, err);
+            }
+
+            return [];
+
+        } finally {
+            if (this.currentAbortController === controller) {
+                this.currentAbortController = null;
             }
         }
-
-        return [];
     }
 
     private setCache(key: string, lyrics: LyricLine[]): void {

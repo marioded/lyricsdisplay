@@ -23,6 +23,7 @@ export type { SettingsStore } from './store/settingStore';
 
 export { usePlayer, registerTimerController } from './hooks/usePlayer';
 export { useI18n } from './hooks/useI18n';
+export { setHttpInstance } from './utils/httpFetch';
 export type { CurrentSongFetcher } from './hooks/usePlayer';
 export * from './hooks/useSongDetails';
 export * from './hooks/useVisibleLyrics';
