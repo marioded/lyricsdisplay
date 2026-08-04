@@ -5,7 +5,7 @@ import { StateStorage } from "zustand/middleware";
 import axios, {AxiosAdapter} from "axios";
 import {invoke} from "@tauri-apps/api/core";
 
-const store = await Store.load("settings.json");
+let store: Store;
 
 const tauriStorage: StateStorage = {
     getItem: async (name) => {
@@ -24,12 +24,14 @@ const tauriStorage: StateStorage = {
     },
 };
 
-export function initDesktopServices() {
+export async function initDesktopServices() {
+    store = await Store.load("settings.json");
+
     useSettingsStore.persist.setOptions({
         storage: createJSONStorage(() => tauriStorage),
     });
 
-    useSettingsStore.persist.rehydrate();
+    await useSettingsStore.persist.rehydrate();
 
     const tauriAxiosAdapter: AxiosAdapter = async (config) => {
         const headers: Record<string,string> = {};
