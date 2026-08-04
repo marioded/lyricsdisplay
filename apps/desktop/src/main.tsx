@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 
 import './index.css'
+import {initDesktopServices} from "@/init";
+
+initDesktopServices()
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
