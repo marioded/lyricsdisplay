@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {useI18n, useSettingsStore} from "@lyricsdisplay/shared";
+import {MAXIMUM_VISIBLE_LINES, useI18n, useSettingsStore} from "@lyricsdisplay/shared";
 import {invoke} from '@tauri-apps/api/core';
 import {emit} from '@tauri-apps/api/event';
 import {disable, enable, isEnabled} from '@tauri-apps/plugin-autostart';
@@ -147,15 +147,44 @@ export const SettingsView: React.FC = () => {
                         </div>
                     </div>
 
-                    <SettingsSelect
-                        label={t("settings.locale")}
-                        value={settings.language}
-                        onChange={(val) => updateSettings({language: val})}
-                        options={availableLanguages.map(lang => ({
-                            value: lang,
-                            label: t(`language.${lang}`)
-                        }))}
-                    />
+                    <div className="mb-6">
+                        <SettingsSelect
+                            label={t("settings.locale")}
+                            value={settings.language}
+                            onChange={(val) => updateSettings({language: val})}
+                            options={availableLanguages.map(lang => ({
+                                value: lang,
+                                label: t(`language.${lang}`)
+                            }))}
+                        />
+                    </div>
+
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center mb-2">
+                            <FieldLabel>{t("settings.visible-lines")}</FieldLabel>
+                            <div
+                                style={{color: accent, backgroundColor: `${accent}1A`}}
+                                className="text-[12px] font-bold px-2.5 py-1 rounded-md"
+                            >
+                                {settings.maxLines}
+                            </div>
+                        </div>
+                        <div
+                            style={{backgroundColor: COLORS.innerWell, borderColor: COLORS.border}}
+                            className="border-[1px] rounded-2xl py-3 px-4 flex items-center"
+                        >
+                            <span className="text-[#A0A0A5] text-xs font-bold mr-4">1</span>
+                            <input
+                                type="range"
+                                value={settings.maxLines}
+                                onChange={(e) => updateSettings({maxLines: Number(e.target.value)})}
+                                min={1}
+                                max={MAXIMUM_VISIBLE_LINES}
+                                className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                            />
+                            <span className="text-[#A0A0A5] text-lg font-bold ml-4">{MAXIMUM_VISIBLE_LINES}</span>
+                        </div>
+                    </div>
                 </SettingsCard>
 
                 <SettingsCard icon={Type}>

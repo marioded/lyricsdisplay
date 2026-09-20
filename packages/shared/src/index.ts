@@ -7,7 +7,7 @@
 export type { Album, Artist, SongItem, Song, LyricSyllable, LyricLine, RawLineLyric, RawSyllableLyric, RawSyllableSection, TranslationEntry } from './types/song';
 export type { ClientSettings } from './types/settings';
 
-export { VISIBLE_LYRICS_COUNT, SONG_FETCH_INTERVAL, DEFAULT_SETTINGS } from './constants/config';
+export { MAXIMUM_VISIBLE_LINES, SONG_FETCH_INTERVAL, DEFAULT_SETTINGS } from './constants/config';
 
 export { LyricsApiService } from './api/lyricsApi';
 export type { LyricsProvider } from './providers';

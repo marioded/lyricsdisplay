@@ -5,7 +5,7 @@ import {useMouseHitTesting} from "@/hooks/useMouseHitTesting";
 import {useWindowController} from "@/hooks/useWindowController";
 import {useTauriFetcher} from "@/hooks/useTauriFetcher";
 import {useSettingsSync} from "@/hooks/useSettingsSync";
-import {usePlayer, useSettingsStore, useVisibleLyrics, VISIBLE_LYRICS_COUNT} from "@lyricsdisplay/shared";
+import {usePlayer, useSettingsStore, useVisibleLyrics} from "@lyricsdisplay/shared";
 
 export const LyricsView: React.FC = () => {
     const fetcher = useTauriFetcher();
@@ -17,7 +17,7 @@ export const LyricsView: React.FC = () => {
     const {visibleLyrics, startIndex} = useVisibleLyrics(
         lyrics,
         centerIndex,
-        VISIBLE_LYRICS_COUNT
+        settings.maxLines
     );
 
     useSettingsSync();

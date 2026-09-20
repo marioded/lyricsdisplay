@@ -20,7 +20,6 @@ import {
   useI18n,
   useSettingsStore,
   useVisibleLyrics,
-  VISIBLE_LYRICS_COUNT,
 } from '@lyricsdisplay/shared';
 import {
   SafeAreaProvider,
@@ -315,7 +314,7 @@ export const LyricsScreen = () => {
   const { visibleLyrics, startIndex } = useVisibleLyrics(
     lyrics,
     centerIndex,
-    settings.maxLines || VISIBLE_LYRICS_COUNT,
+    settings.maxLines
   );
 
   const hasOppositeAligned = useMemo(

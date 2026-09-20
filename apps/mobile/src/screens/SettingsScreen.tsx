@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import {
+  MAXIMUM_VISIBLE_LINES,
   SettingsStore,
   useI18n,
   useSettingsStore,
@@ -45,7 +46,10 @@ const FONT_OPTIONS = [
   { label: 'Sans-Serif Black', value: 'sans-serif-black' },
 ];
 
-const VISIBLE_LINE_OPTIONS = [1, 3, 5, 7];
+const VISIBLE_LINE_OPTIONS = Array.from(
+  { length: MAXIMUM_VISIBLE_LINES },
+  (_, i) => i + 1,
+);
 
 const SectionTitle = React.memo<{ icon: any }>(({ icon: Icon }) => (
   <View className="flex-row items-center mb-5">
@@ -367,7 +371,7 @@ export const SettingsScreen: React.FC<Props> = ({ onClose }) => {
             <FieldLabel>{t('settings.visible-lines')}</FieldLabel>
             <View className="mt-2">
               <VisibleLinesPicker
-                value={maxLines || 3}
+                value={maxLines}
                 accent={accent}
                 onChange={onMaxLinesChange}
               />

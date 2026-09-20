@@ -6,5 +6,5 @@ export interface ClientSettings {
     fontName: string;
     fontSize: number;
     color: string;
-    maxLines?: number;
+    maxLines: number;
 }
