@@ -95,10 +95,7 @@ export const LyricLineRow: React.FC<LyricLineRowProps> = React.memo(
                 return (
                     <span style={{
                         color: isPast ? colors.past : colors.inactive,
-                        textShadow: isPast
-                            ? `0 2px 6px rgba(0,0,0,0.3), 0 0 10px ${colors.glowSoft}`
-                            : "0 1px 3px rgba(0,0,0,0.2)",
-                        fontWeight: isPast ? 550 : 400,
+                        fontWeight: 450,
                         filter: isPast ? "brightness(1.05)" : "brightness(0.88)",
                         transition: "color 0.2s ease",
                     }}>
