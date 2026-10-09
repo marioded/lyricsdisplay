@@ -64,7 +64,7 @@ export async function initDesktopServices() {
     };
 
     const instance = axios.create({
-        timeout: 12000,
+        timeout: 15000,
 
         adapter: tauriAxiosAdapter
     });

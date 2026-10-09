@@ -1,12 +1,8 @@
 import axios, { AxiosInstance } from "axios";
 
 let httpInstance: AxiosInstance = axios.create({
-    timeout: 12000,
+    timeout: 20000,
 });
-
-export function getHttp(): AxiosInstance {
-    return httpInstance;
-}
 
 export function setHttpInstance(instance: AxiosInstance) {
     httpInstance = instance;
@@ -17,7 +13,7 @@ export async function httpGet(
     headers: Record<string, string> = {},
     signal?: AbortSignal
 ): Promise<string> {
-    const res = await getHttp().get<string>(url, {
+    const res = await httpInstance.get<string>(url, {
         headers,
         responseType: "text",
         transformResponse: [(data) => data],

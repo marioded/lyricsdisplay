@@ -1,7 +1,8 @@
 import {LyricLine} from '../types/song';
-import {LyricsProviderManager, PaxsenixProvider} from '../providers';
+import {KpocProvider, LyricsProviderManager, PaxsenixProvider} from '../providers';
 
 const defaultProviders = [
+    new KpocProvider(),
     new PaxsenixProvider()
 ];
 

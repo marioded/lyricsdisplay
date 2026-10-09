@@ -11,7 +11,7 @@ export { MAXIMUM_VISIBLE_LINES, SONG_FETCH_INTERVAL, DEFAULT_SETTINGS } from './
 
 export { LyricsApiService } from './api/lyricsApi';
 export type { LyricsProvider } from './providers';
-export { LyricsProviderManager, PaxsenixProvider } from './providers';
+export { LyricsProviderManager, PaxsenixProvider, KpocProvider } from './providers';
 
 
 export { PlayerService } from './service/playerService';
