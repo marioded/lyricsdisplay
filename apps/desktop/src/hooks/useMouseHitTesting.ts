@@ -3,6 +3,8 @@ import {invoke} from '@tauri-apps/api/core';
 import {getCurrentWindow} from '@tauri-apps/api/window';
 import {listen} from '@tauri-apps/api/event';
 
+type AppWindow = ReturnType<typeof getCurrentWindow>;
+
 interface ElementRect {
     left: number;
     top: number;
@@ -10,111 +12,175 @@ interface ElementRect {
     bottom: number;
 }
 
-export const useMouseHitTesting = (dependencies: any[]) => {
-    const cachedRectsRef = useRef<ElementRect[]>([]);
+interface CursorPosition {
+    x: number;
+    y: number;
+}
 
-    const updateCachedRects = () => {
-        const dragElements = document.querySelectorAll('[data-tauri-drag-region]');
-        const rects: ElementRect[] = [];
-        dragElements.forEach(el => {
-            const rect = el.getBoundingClientRect();
-            rects.push({
-                left: rect.left,
-                top: rect.top,
-                right: rect.left + rect.width,
-                bottom: rect.top + rect.height
-            });
+const GEOMETRY_RETRY_DELAYS_MS = [300, 1000, 3000];
+const GEOMETRY_RETRY_INTERVAL_MS = 2000;
+
+const queryDragRects = (): ElementRect[] => {
+    const rects: ElementRect[] = [];
+    document.querySelectorAll('[data-tauri-drag-region]').forEach(el => {
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        rects.push({
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom
         });
-        cachedRectsRef.current = rects;
+    });
+    return rects;
+};
+
+export const useMouseHitTesting = (dependencies: any[]) => {
+    const winRef = useRef<AppWindow | null>(null);
+    const lastCursorRef = useRef<CursorPosition | null>(null);
+    const innerPosRef = useRef<CursorPosition>({x: 0, y: 0});
+    const scaleFactorRef = useRef(1);
+    const geometryReadyRef = useRef(false);
+    const lastIgnoreRef = useRef<boolean | null>(null);
+
+    const applyIgnoreState = (shouldIgnore: boolean) => {
+        const win = winRef.current;
+        if (!win || lastIgnoreRef.current === shouldIgnore) return;
+        lastIgnoreRef.current = shouldIgnore;
+        win.setIgnoreCursorEvents(shouldIgnore).catch(console.error);
+    };
+
+    const evaluate = () => {
+        if (!winRef.current) return;
+
+        const rects = queryDragRects();
+
+        if (rects.length === 0) {
+            applyIgnoreState(true);
+            return;
+        }
+
+        const cursor = lastCursorRef.current;
+        if (!cursor || !geometryReadyRef.current) return;
+
+        const {x: originX, y: originY} = innerPosRef.current;
+        const scale = scaleFactorRef.current;
+
+        let isEnter = false;
+        for (const rect of rects) {
+            const left = originX + rect.left * scale;
+            const top = originY + rect.top * scale;
+            const right = originX + rect.right * scale;
+            const bottom = originY + rect.bottom * scale;
+
+            if (cursor.x >= left && cursor.x <= right &&
+                cursor.y >= top && cursor.y <= bottom) {
+                isEnter = true;
+                break;
+            }
+        }
+
+        applyIgnoreState(!isEnter);
+    };
+
+    const refreshGeometry = async () => {
+        const win = winRef.current;
+        if (!win) return;
+
+        try {
+            const position = await win.innerPosition();
+            innerPosRef.current = {x: position.x, y: position.y};
+            scaleFactorRef.current = await win.scaleFactor();
+            geometryReadyRef.current = true;
+            evaluate();
+        } catch (e) {
+            console.error("Failed to refresh window geometry:", e);
+        }
     };
 
     useEffect(() => {
-        const handle = requestAnimationFrame(() => {
-            updateCachedRects();
-        });
-
-        const handleResize = () => {
-            updateCachedRects();
-        };
-
-        window.addEventListener('resize', handleResize);
-        return () => {
-            cancelAnimationFrame(handle);
-            window.removeEventListener('resize', handleResize);
-        };
+        evaluate();
     }, dependencies);
 
     useEffect(() => {
-        let unlistenMouse: (() => void) | undefined;
-        let unlistenMove: (() => void) | undefined;
-        let isStarted = false;
+        let disposed = false;
+        let streamStarted = false;
+        let geometryInterval: number | undefined;
+        const unlisteners: Array<(() => void) | undefined> = [];
+        const timeoutIds: number[] = [];
 
-        const initHitTesting = async () => {
+        const init = async () => {
             try {
                 const win = getCurrentWindow();
+                winRef.current = win;
+
                 await invoke('start_global_mouse_stream').catch(console.error);
-                isStarted = true;
+                streamStarted = true;
+                if (disposed) return;
 
-                await win.setIgnoreCursorEvents(true).catch(e => console.error("Initial ignore cursor failed:", e));
+                await win.setIgnoreCursorEvents(true)
+                    .catch(e => console.error("Initial ignore cursor failed:", e));
+                lastIgnoreRef.current = true;
+                if (disposed) return;
 
-                let innerPos = await win.innerPosition().catch(() => ({x: 0, y: 0}));
-                let scaleFactor = await win.scaleFactor().catch(() => 1);
+                await refreshGeometry();
 
-                const moveCb = await win.onMoved(async () => {
-                    try {
-                        innerPos = await win.innerPosition();
-                        scaleFactor = await win.scaleFactor();
-                    } catch (e) {
+                geometryInterval = window.setInterval(() => {
+                    if (disposed || geometryReadyRef.current) {
+                        window.clearInterval(geometryInterval);
+                        return;
                     }
+                    refreshGeometry();
+                }, GEOMETRY_RETRY_INTERVAL_MS);
+
+                GEOMETRY_RETRY_DELAYS_MS.forEach(delay => {
+                    timeoutIds.push(window.setTimeout(() => {
+                        if (!disposed) refreshGeometry();
+                    }, delay));
                 });
-                unlistenMove = moveCb;
 
-                let lastIgnoreState: boolean | null = null;
+                unlisteners.push(await win.onMoved(() => {
+                    refreshGeometry();
+                }));
+                if (disposed) return;
 
-                unlistenMouse = await listen<string>('device-mouse-move', ({payload}) => {
+                unlisteners.push(await win.onResized(() => {
+                    evaluate();
+                }));
+                if (disposed) return;
+
+                unlisteners.push(await win.onFocusChanged(({payload: focused}) => {
+                    if (focused && !disposed) refreshGeometry();
+                }));
+                if (disposed) return;
+
+                unlisteners.push(await listen<string>('device-mouse-move', ({payload}) => {
                     try {
                         const {x: payloadX, y: payloadY} = JSON.parse(payload);
-                        const rects = cachedRectsRef.current;
-
-                        if (rects.length === 0) return;
-
-                        let isEnter = false;
-                        for (let i = 0; i < rects.length; i++) {
-                            const rect = rects[i];
-                            const globalLeft = innerPos.x + (rect.left * scaleFactor);
-                            const globalTop = innerPos.y + (rect.top * scaleFactor);
-                            const globalRight = innerPos.x + (rect.right * scaleFactor);
-                            const globalBottom = innerPos.y + (rect.bottom * scaleFactor);
-
-                            if (payloadX >= globalLeft && payloadX <= globalRight &&
-                                payloadY >= globalTop && payloadY <= globalBottom) {
-                                isEnter = true;
-                                break;
-                            }
-                        }
-
-                        const shouldIgnore = !isEnter;
-
-                        if (shouldIgnore !== lastIgnoreState) {
-                            lastIgnoreState = shouldIgnore;
-                            win.setIgnoreCursorEvents(shouldIgnore).catch(console.error);
-                        }
+                        lastCursorRef.current = {x: payloadX, y: payloadY};
+                        evaluate();
                     } catch (e) {
                     }
-                });
+                }));
             } catch (e) {
                 console.error("Failed to init hit testing:", e);
             }
         };
 
-        initHitTesting();
+        init();
 
         return () => {
-            if (unlistenMouse) unlistenMouse();
-            if (unlistenMove) unlistenMove();
-            if (isStarted) {
+            disposed = true;
+            timeoutIds.forEach(id => clearTimeout(id));
+            if (geometryInterval !== undefined) {
+                window.clearInterval(geometryInterval);
+            }
+            unlisteners.forEach(unlisten => unlisten?.());
+            if (streamStarted) {
                 invoke('stop_global_mouse_stream').catch(console.error);
             }
+            winRef.current = null;
+            lastIgnoreRef.current = null;
         };
     }, []);
 };

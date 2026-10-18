@@ -120,7 +120,7 @@ export const LyricLineRow: React.FC<LyricLineRowProps> = React.memo(
             }
 
             return (
-                <span style={{
+                <span data-tauri-drag-region style={{
                     color: colors.active,
                     textShadow: `0 0 10px ${colors.glow}`,
                     fontWeight: 400,
