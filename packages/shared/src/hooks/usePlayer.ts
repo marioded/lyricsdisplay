@@ -132,7 +132,8 @@ class PlayerIntervalManager {
                 PlayerService.getInstance().fetchLyrics(
                     currentSong.item.name,
                     currentSong.item.artists?.[0]?.name ?? "",
-                    currentSong.item.album.name
+                    currentSong.item.album.name,
+                    currentSong.item.duration_ms
                 ).then((newLyrics) => {
                     const latestSongId = hashSong(usePlayerStore.getState().song);
                     if (latestSongId === currentSongId && newLyrics.length) {

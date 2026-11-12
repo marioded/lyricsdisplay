@@ -9,14 +9,14 @@ const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:95.0) Gecko/201
 const AM_API = 'https://amp-api.music.apple.com/v1/catalog/us';
 const AM_WEB = 'https://beta.music.apple.com';
 
-async function fetchAppleMusicToken(forceRefresh = false): Promise<string> {
+async function fetchAppleMusicToken(signal: AbortSignal, forceRefresh = false): Promise<string> {
     if (!forceRefresh && cachedToken) return cachedToken;
 
-    const mainHtml = await httpGet(AM_WEB, {'User-Agent': BROWSER_UA});
+    const mainHtml = await httpGet(AM_WEB, {'User-Agent': BROWSER_UA}, signal);
     const indexJsMatch = mainHtml.match(/\/assets\/index~[^/]+\.js/);
     if (!indexJsMatch) throw new Error('[Paxsenix] index JS URL not found');
 
-    const jsBundle = await httpGet(AM_WEB + indexJsMatch[0], {'User-Agent': BROWSER_UA});
+    const jsBundle = await httpGet(AM_WEB + indexJsMatch[0], {'User-Agent': BROWSER_UA}, signal);
     const tokenMatch = jsBundle.match(/eyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+/);
     if (!tokenMatch) throw new Error('[Paxsenix] JWT token not found in JS bundle');
 
@@ -51,6 +51,8 @@ async function searchAppleMusic(title: string, artist: string, token: string, si
         const best = songsData.find(s => (resources[s.id]?.attributes?.name ?? '').toLowerCase() === titleLc) ?? songsData[0];
         return best?.id ?? null;
     } catch (err: any) {
+        if (signal?.aborted || err?.name === 'CanceledError' || err?.name === 'AbortError') throw err;
+
         const errMsg = String(err?.message ?? err);
         if (errMsg.includes('401')) {
             throw new Error('401');
@@ -62,6 +64,7 @@ async function searchAppleMusic(title: string, artist: string, token: string, si
 export class PaxsenixProvider implements LyricsProvider {
     private static PAXSENIX_API = 'https://lyrics.paxsenix.org/apple-music/lyrics?id=';
     readonly name = 'paxsenix';
+    readonly timeoutMs = 8000;
 
     async fetchLyrics(title: string, artist: string, _album: string, signal: AbortSignal): Promise<LyricLine[]> {
         const trackId = await this.resolveTrackId(title, artist, signal)
@@ -72,19 +75,20 @@ export class PaxsenixProvider implements LyricsProvider {
 
     private async resolveTrackId(title: string, artist: string, signal: AbortSignal): Promise<string | null> {
         try {
-            let token = await fetchAppleMusicToken();
+            let token = await fetchAppleMusicToken(signal);
             try {
                 return await searchAppleMusic(title, artist, token, signal);
             } catch (err: any) {
                 if (err.message === '401' && cachedToken) {
                     cachedToken = null;
-                    token = await fetchAppleMusicToken(true);
+                    token = await fetchAppleMusicToken(signal, true);
                     return await searchAppleMusic(title, artist, token, signal);
                 }
 
                 throw err;
             }
-        } catch (err) {
+        } catch (err: any) {
+            if (signal?.aborted || err?.name === 'CanceledError' || err?.name === 'AbortError') throw err;
             console.warn('[Paxsenix] resolveTrackId error:', err);
             return null;
         }
@@ -93,8 +97,10 @@ export class PaxsenixProvider implements LyricsProvider {
     private async fetchFromPaxsenix(trackId: string, signal: AbortSignal): Promise<LyricLine[]> {
         try {
             const body = await httpGetJson(`${PaxsenixProvider.PAXSENIX_API}${trackId}`, {}, signal);
+            console.log(body)
             return PaxsenixProvider.parse(body);
-        } catch {
+        } catch (err: any) {
+            if (signal?.aborted || err?.name === 'CanceledError' || err?.name === 'AbortError') throw err;
             return [];
         }
     }

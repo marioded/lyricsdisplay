@@ -5,20 +5,24 @@ import {httpGetJson} from '../utils/httpFetch';
 export class KpocProvider implements LyricsProvider {
     private static KPOC_API = 'https://lyricsplus.prjktla.my.id/v2/lyrics/get';
     readonly name = 'kpoc';
+    readonly timeoutMs = 5000;
 
     async fetchLyrics(title: string, artist: string, _album: string, signal: AbortSignal): Promise<LyricLine[]> {
         const url = `${KpocProvider.KPOC_API}?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`;
 
         try {
             const body = await httpGetJson(url, {}, signal);
+            console.log(body)
             return KpocProvider.parse(body);
-        } catch (err) {
+        } catch (err: any) {
+            if (signal?.aborted || err?.name === 'CanceledError' || err?.name === 'AbortError') throw err;
             console.warn('[Kpoc] fetchLyrics error:', err);
             return [];
         }
     }
 
     static parse(data: any): LyricLine[] {
+        console.log(data)
         if (!Array.isArray(data?.lyrics)) return [];
 
         const isSynced = data.type === 'Word';

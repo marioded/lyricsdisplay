@@ -14,8 +14,8 @@ export class PlayerService {
         return PlayerService.instance;
     }
 
-    async fetchLyrics(title: string, author: string, album: string): Promise<LyricLine[]> {
-        return await this.backendApi.fetchLyrics(title, author, album);
+    async fetchLyrics(title: string, author: string, album: string, durationMs?: number): Promise<LyricLine[]> {
+        return await this.backendApi.fetchLyrics(title, author, album, durationMs);
     }
 
     calculateCurrentLyricIndex(lyrics: LyricLine[], currentProgressMs: number): number {

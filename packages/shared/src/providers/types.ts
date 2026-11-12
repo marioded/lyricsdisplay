@@ -2,14 +2,18 @@ import {LyricLine} from '../types/song';
 
 export interface LyricsProvider {
     readonly name: string;
+    readonly timeoutMs?: number;
 
     fetchLyrics(
         title: string,
         artist: string,
         album: string,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        durationMs?: number
     ): Promise<LyricLine[]>;
 }
+
+const DEFAULT_PROVIDER_TIMEOUT_MS = 6000;
 
 function cleanTitle(title: string) {
     return title.replace(/ *\([^)]*\) */g, '').trim();
@@ -28,6 +32,7 @@ export class LyricsProviderManager {
         title: string,
         artist: string,
         album: string,
+        durationMs?: number,
     ): Promise<LyricLine[]> {
         const key = `${title.toLowerCase()}__${artist.toLowerCase()}`;
 
@@ -44,15 +49,27 @@ export class LyricsProviderManager {
 
         try {
             for (const provider of this.providers) {
+                if (controller.signal.aborted) {
+                    console.log("[LyricsProvider] Request aborted");
+                    return [];
+                }
+
                 try {
                     console.log(`[LyricsProvider] Trying ${provider.name} for "${title}" by "${artist}"`);
 
-                    const lyrics = await provider.fetchLyrics(
+                    const lyrics = await this.fetchWithTimeout(
+                        provider,
                         title,
                         artist,
                         album,
-                        controller.signal
+                        controller.signal,
+                        durationMs
                     );
+
+                    if (controller.signal.aborted) {
+                        console.log("[LyricsProvider] Request aborted");
+                        return [];
+                    }
 
                     if (lyrics.length > 0) {
                         console.log(`[LyricsProvider] ${provider.name} returned ${lyrics.length} lines`);
@@ -73,6 +90,13 @@ export class LyricsProviderManager {
                         return [];
                     }
 
+                    if (err.name === "TimeoutError") {
+                        console.warn(
+                            `[LyricsProvider] ${provider.name} timed out, skipping to next provider`
+                        );
+                        continue;
+                    }
+
                     console.warn(
                         `[LyricsProvider] ${provider.name} threw:`,
                         err
@@ -86,6 +110,43 @@ export class LyricsProviderManager {
             if (this.currentAbortController === controller) {
                 this.currentAbortController = null;
             }
+        }
+    }
+
+    private async fetchWithTimeout(
+        provider: LyricsProvider,
+        title: string,
+        artist: string,
+        album: string,
+        parentSignal: AbortSignal,
+        durationMs?: number
+    ): Promise<LyricLine[]> {
+        const timeoutMs = provider.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS;
+        const controller = new AbortController();
+
+        const onAbort = () => controller.abort();
+        parentSignal.addEventListener('abort', onAbort, {once: true});
+
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        const timeout = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+                controller.abort();
+
+                const err = new Error(`${provider.name} timed out after ${timeoutMs}ms`);
+                err.name = 'TimeoutError';
+                reject(err);
+            }, timeoutMs);
+        });
+
+        try {
+            return await Promise.race([
+                provider.fetchLyrics(title, artist, album, controller.signal, durationMs),
+                timeout,
+            ]);
+        } finally {
+            if (timer !== undefined) clearTimeout(timer);
+            parentSignal.removeEventListener('abort', onAbort);
         }
     }
 
