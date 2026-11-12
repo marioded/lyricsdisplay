@@ -30,6 +30,11 @@ const Char = React.memo(({char: {char, state}, colors}: {
     <span
         style={{
             color: state === "future" ? colors.inactive : colors.active,
+            textShadow: state === "active"
+                ? `0 0 18px ${colors.glow}, 0 0 8px ${colors.glow}, 0 4px 12px rgba(0,0,0,0.5)`
+                : state === "past"
+                    ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${colors.glowSoft}`
+                    : "0 2px 4px rgba(0,0,0,0.25)",
             filter: state === "active"
                 ? "brightness(1.4) saturate(1.2)"
                 : state === "past" ? "brightness(1.05)" : "brightness(0.88)",
@@ -71,6 +76,9 @@ const Syllable = React.memo(({syllable, currentProgressMs, colors}: {
     return (
         <span style={{
             color: isPast ? colors.active : colors.inactive,
+            textShadow: isPast
+                ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${colors.glowSoft}`
+                : "0 2px 4px rgba(0,0,0,0.25)",
             filter: isPast ? "brightness(1.05)" : "brightness(0.88)",
             transition: "color 0.12s ease, text-shadow 0.18s ease",
             letterSpacing: "0.02em",
@@ -95,7 +103,10 @@ export const LyricLineRow: React.FC<LyricLineRowProps> = React.memo(
                 return (
                     <span style={{
                         color: isPast ? colors.past : colors.inactive,
-                        fontWeight: 450,
+                        textShadow: isPast
+                            ? `0 2px 6px rgba(0,0,0,0.3), 0 0 10px ${colors.glowSoft}`
+                            : "0 1px 3px rgba(0,0,0,0.2)",
+                        fontWeight: isPast ? 550 : 400,
                         filter: isPast ? "brightness(1.05)" : "brightness(0.88)",
                         transition: "color 0.2s ease",
                     }}>
@@ -105,9 +116,11 @@ export const LyricLineRow: React.FC<LyricLineRowProps> = React.memo(
             }
 
             if (line.syllables && line.syllables.length > 0) {
-                return line.syllables.map((syl, idx) => (
+                const syllables = line.syllables;
+
+                return syllables.map((syl, idx) => (
                     <React.Fragment key={`${syl.startTimeMs}-${idx}`}>
-                        {needsSpaceBefore(idx, line.syllables[idx - 1]?.partOfWord ?? false) && (
+                        {needsSpaceBefore(idx, syllables[idx - 1]?.partOfWord ?? false) && (
                             <span style={{color: colors.inactive}}>{"\u00A0"}</span>
                         )}
                         <Syllable
@@ -122,7 +135,7 @@ export const LyricLineRow: React.FC<LyricLineRowProps> = React.memo(
             return (
                 <span data-tauri-drag-region style={{
                     color: colors.active,
-                    textShadow: `0 0 10px ${colors.glow}`,
+                    textShadow: `0 0 18px ${colors.glow}, 0 0 8px ${colors.glow}, 0 4px 12px rgba(0,0,0,0.5)`,
                     fontWeight: 400,
                 }}>
                     {line.text}
